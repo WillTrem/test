@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+# set -euo pipefail
 
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 APP_PATH="$SCRIPT_DIR/apps"
