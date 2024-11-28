@@ -1,0 +1,17 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "AdaptiveUI",
+            "Group": "Servers",
+            "Port": 5432,
+            "Username": "firstuser",
+            "Host": "db",
+            "SSLMode": "prefer",
+            "MaintenanceDB": "postgres",
+            "ConnectionParameters": {
+                "sslmode": "prefer",
+                "passfile": "/pgadmin4/pgpass"
+            }
+        }
+    }
+}

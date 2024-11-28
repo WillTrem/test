@@ -1,0 +1,144 @@
+services:
+  db:
+    image: willtrem/postgres:latest
+    container_name: db-postgres
+    env_file:
+      - ./env/.env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_NAME}
+      PGUSER: web_anon
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - backend
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    image: postgrest/postgrest:v12.0.2
+    container_name: pgrest
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${AUTHENTICATOR_ROLE_PASSWORD}@db-postgres:5432/${POSTGRES_DB_NAME}
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://127.0.0.1:3000
+      PGRST_DB_ANON_ROLE: web_anon
+      PGRST_SERVER_CORS_ALLOWED_ORIGINS: ${PLATFORM_DOMAIN}
+      PGRST_DB_PRE_CONFIG: postgrest.pre_config
+      PGRST_DB_CHANNEL: pgrst
+      PGRST_DB_CHANNEL_ENABLED: True
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_LOG_LEVEL: ${PGRST_LOG_LEVEL}
+      PGRST_OPENAPI_MODE: ignore-privileges
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: always
+
+  pgadmin:
+    image: dpage/pgadmin4:8.2
+    container_name: pgadmin
+    user: "root"
+    entrypoint: >
+      /bin/sh -c "
+      echo 'db:5432:*:firstuser:defaultpassword' > /pgadmin4/pgpass;
+      chmod 600 /pgadmin4/pgpass;
+      /entrypoint.sh
+      "
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
+      - PGADMIN_SERVER_JSON_FILE=/pgadmin4/config/servers.json
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - pgadmin-config:/pgadmin4/config # preconfigured servers/connections
+    ports:
+      - "127.0.0.1:5050:80"
+    networks:
+      - backend
+    profiles:
+      - dev
+
+  front-end:
+    image: willtrem/adaptive-ui-test:latest
+    container_name: adaptive-ui
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB_NAME: ${POSTGRES_DB_NAME}
+      POSTGREST_ENDPOINT: ${POSTGREST_ENDPOINT}
+    ports:
+      - 127.0.0.1:8080:80
+    networks:
+      - backend
+    volumes:
+      - front-end-config:/app/configs
+      - front-end-apps:/app/apps
+    depends_on:
+      db:
+        condition: service_healthy
+
+  minio:
+    image: bitnami/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOTUSER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOTPASSWORD}
+    volumes:
+      - minio-data:/bitnami/minio/data
+      - minio-certs:/certs
+    networks:
+      - backend
+
+volumes:
+  db-data:
+    name: db-data
+    driver: local
+  minio-data:
+    name: minio_data
+    driver: local
+  minio-certs:
+    name: minio-certs
+    driver: local
+  pgadmin-data:
+    name: pgadmin-data
+  pgadmin-config:
+    name: pgadmin-config
+    driver: local
+    driver_opts:
+      type: none
+      device: ./pgadmin-config
+      o: bind
+  front-end-apps:
+    name: front-end-apps
+    driver: local
+    driver_opts:
+      type: none
+      device: ./apps
+      o: bind
+  front-end-config:
+    name: front-end-config
+    driver: local
+    driver_opts:
+      type: none
+      device: ./configs
+      o: bind
+
+networks:
+  backend:
+    name: backend
