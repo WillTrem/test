@@ -206,7 +206,7 @@ sync-template(){
   
   git fetch template && \
   git merge template/main --allow-unrelated-histories --squash --strategy-option theirs && \
-  if gitignore_exists; then git checkout HEAD -- .gitignore; else git rm .gitignore; fi && \
+  if $gitignore_exists; then git checkout HEAD -- .gitignore; else git rm .gitignore; fi && \
   git commit -m "Merge remote-tracking branch 'template/main' from template repository" && \
   git push
 }
