@@ -217,7 +217,7 @@ sync-template(){
   # Check if the merge brought any changes
   if git diff-index --quiet HEAD --; then
     echo "No new changes from the template remote."
-    git merge --abort
+    rm -f .git/SQUASH_MSG 
     exit 1
   fi
   
