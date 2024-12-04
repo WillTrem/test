@@ -198,12 +198,9 @@ sync-template(){
 
   # Check for uncommitted changes
   if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    # Check if there are changes in tracked files
-    if git diff-index --quiet HEAD --; then
-      echo "There are uncommitted changes in the repository."
-      echo "Please commit or stash them before running sync-template."
-      exit 1
-    fi
+    echo "There are uncommitted changes in the repository."
+    echo "Please commit or stash them before running sync-template."
+    exit 1
   fi
 
   # Check if a "template" remote has already been setup
