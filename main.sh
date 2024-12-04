@@ -220,6 +220,7 @@ sync-template(){
     git merge --abort
     exit 1
   fi
+  
   # Prevent merging .gitignore file
   git commit -m "Merge remote-tracking branch 'template/main' from template repository" && \
   git push && \
