@@ -201,10 +201,12 @@ sync-template(){
     git remote add -t main "$remote_name" "$remote_url"
     git remote set-url --push "$remote_name" DISALLOWED
   fi
+
+  local gitignore_exists=$( [ -f .gitignore ] && echo true || echo false )
   
   git fetch template && \
   git merge template/main --allow-unrelated-histories --squash --strategy-option theirs && \
-  if [ -f .gitignore ]; then git checkout HEAD -- .gitignore; fi && \
+  if gitignore_exists; then git checkout HEAD -- .gitignore; else git rm .gitignore; fi && \
   git commit -m "Merge remote-tracking branch 'template/main' from template repository" && \
   git push
 }
