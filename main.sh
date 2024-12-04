@@ -197,7 +197,7 @@ sync-template(){
   fi
 
   # Check for uncommitted changes
-  if [ -n "$(git status --porcelain)" ]; then
+  if ! git diff-index --quiet HEAD --; then
     echo "There are uncommitted changes in the repository."
     echo "Please commit or stash them before running sync-template."
     exit 1
