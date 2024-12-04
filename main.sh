@@ -202,9 +202,23 @@ sync-template(){
     git remote set-url --push "$remote_name" DISALLOWED
   fi
 
-  local gitignore_exists=$( [ -f .gitignore ] && echo true || echo false )
+ # Get the commit hash of the remote branch before fetching
+  local remote_commit_before=$(git rev-parse "$remote_name/main")
+
+  # Fetch the latest changes from the template remote
+  git fetch "$remote_name"
+
+  # Get the commit hash of the remote branch after fetching
+  local remote_commit_after=$(git rev-parse "$remote_name/main")
+
+  # Compare the commit hashes
+  if [ "$remote_commit_before" = "$remote_commit_after" ]; then
+    echo "No new changes from the template remote."
+    exit 0
+  fi
   
-  git fetch template && \
+  local gitignore_exists=$( [ -f .gitignore ] && echo true || echo false )
+  # git fetch template && \
   git merge template/main --allow-unrelated-histories --squash --strategy-option theirs && \
   # Prevent merging .gitignore file
   if $gitignore_exists; then git checkout HEAD -- .gitignore; else git rm -f .gitignore; fi && \ 
