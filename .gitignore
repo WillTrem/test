@@ -1,0 +1,7 @@
+# Ignore everything in configs and apps directories
+configs/*
+apps/*
+
+# Keep the directories by not ignoring .gitkeep files
+!configs/.gitkeep
+!apps/.gitkeep
