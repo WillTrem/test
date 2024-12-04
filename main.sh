@@ -212,16 +212,8 @@ sync-template(){
   local gitignore_exists=$( [ -f .gitignore ] && echo true || echo false )
   git fetch "$remote_name"  && \
   git merge template/main --allow-unrelated-histories --squash --strategy-option theirs && \
-  if $gitignore_exists; then git checkout HEAD -- .gitignore; else git rm -f .gitignore; fi  
-
-  # Check if the merge brought any changes
-  if git diff-index --quiet HEAD --; then
-    echo "No new changes from the template remote."
-    git merge --abort
-    exit 1
-  fi
-  
   # Prevent merging .gitignore file
+  if $gitignore_exists; then git checkout HEAD -- .gitignore; else git rm -f .gitignore; fi && \ 
   git commit -m "Merge remote-tracking branch 'template/main' from template repository" && \
   git push && \
   echo "Sync with template remote successful"
