@@ -11,18 +11,20 @@ PROFILE="dev"
 
 print_help() {
   echo "Usage: $0 [--profile PROFILE] {up|down|pull|reboot|reset-app|reset-apps|drop-apps|logs|lint|export|import}"
-  echo "  up                   : Start all services using the specified profile (default: dev)"
-  echo "  down                 : Stop all services"
-  echo "  pull                 : Pull the latest images"
-  echo "  logs                 : Follow the logs of the services (optionally specify services as csv)"
-  echo "  reboot                : Resets everything in the database except the users"
-  echo "  reset-app <app_name> : Reset only an application and its data"
-  echo "  reset-apps           : Reset all the applications and their data"
-  echo "  drop-apps <app_name> : Drops an application (all applications if none is provided)"
-  echo "  lint                 : Lints all the sql files under apps/ "
-  echo "  export               : Exports the app configuration and translation data to files in configs/"
-  echo "  import               : Imports the app configuration and translation data from files in configs/"
-  echo "  init                 : Initializes permissions for bind mount volumes"
+  echo "  up                       : Start all services using the specified profile (default: dev)"
+  echo "  down                     : Stop all services"
+  echo "  pull                     : Pull the latest images"
+  echo "  sync-template            : Synchronizes the repo with the template repository"
+  echo "  logs                     : Follow the logs of the services (optionally specify services as csv)"
+  echo "  load-apps [<app_names>]  : Load apps into the system (optionally specify apps as csv)"
+  echo "  drop-apps [<app_names>]  : Drop apps from the system (optionally specify apps as csv)"
+  echo "  reset-apps [<app_names>] : Reset apps and their data (optionally specify app names as csv)"
+  echo "  reboot                   : Resets everything in the database except the users"
+  echo "  lint                     : Lints all the sql files under apps/ "
+  echo "  export                   : Exports the app configuration and translation data to files in configs/"
+  echo "  import                   : Imports the app configuration from configs/latest/"
+  echo "                              and translation data from configs/lang.json "
+  echo "  init                     : Initializes permissions for bind mount volumes"
   exit 1
 }
 
@@ -32,25 +34,16 @@ while [[ "$#" -gt 0 ]]; do
     PROFILE="$2"
     shift
     ;;
-  up | down | pull | reboot | reset-apps | import | export | init | lint)
+  up | down | pull | reboot | import | export | init | lint | sync-template)
     ACTION="$1"
     shift
     break
     ;;
-  reset-app)
-    if [ $# -ne 2 ]; then
-      echo "Error: reset-app requires exactly one argument (app_name)"
-    fi
-    ACTION="reset-app"
-    APP_NAME="$2"
-    shift 2
-    break
-    ;;
-  drop-apps)
+  load-apps | drop-apps | reset-apps)
     ACTION="$1"
-    APP_NAME="$2"
+    APP_NAMES="$2"
     shift 2
-    break
+    break 
     ;;
   logs)
     ACTION="logs"
@@ -104,34 +97,50 @@ compose_logs() {
   fi
 }
 
-# reset_volumes() {
-#   docker volume rm db-data-test || true
-#   docker volume rm minio_data || true
-# }
+load-apps(){
+  local app_names="$1";
 
-reboot() {
-  # compose_down "$PROFILE" &&
-  #   reset_volumes &&
-  #   compose_pull &&
-  #   compose_up "$PROFILE"
-  docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/hard_reboot.sh
+  if [[ -n app_name ]]; then
+    IFS=',' read -r -a app_array <<<"$app_names"
+    for app_name in "${app_array[@]}"; do
+      docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/load_apps.sh --app "$app_name"
+    done
+  else
+    docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/load_apps.sh
+  fi  
+
 }
 
+drop-apps(){
+    local app_names="$1";
 
-reset-app() {
-  local app_name="$1"
-  compose_up_fast "$PROFILE"
-  # "$SCRIPT_DIR/drop_apps.sh" --profile "$PROFILE" --app "$app_name"
-  docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/drop_apps.sh --app "$app_name"
-  docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/load_apps.sh --app "$app_name"
+  if [[ -n app_name ]]; then
+    IFS=',' read -r -a app_array <<<"$app_names"
+    for app_name in "${app_array[@]}"; do
+      docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/drop_apps.sh --app "$app_name"
+    done
+  else
+    docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/drop_apps.sh 
+  fi  
 }
 
 reset-apps() {
-  compose_up_fast "$PROFILE"
-  # "$SCRIPT_DIR/drop_apps.sh" --profile "$PROFILE"
-  docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/drop_apps.sh 
-  docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/refresh_apps.sh
+  local app_names="$1";
 
+  if [[ -n app_name ]]; then
+    IFS=',' read -r -a app_array <<<"$app_names"
+    for app_name in "${app_array[@]}"; do
+      docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/drop_apps.sh --app "$app_name"
+      docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/load_apps.sh --app "$app_name"
+    done
+  else
+    docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/drop_apps.sh 
+    docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/load_apps.sh
+  fi  
+}
+
+reboot() {
+  docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/hard_reboot.sh
 }
 
 import-all(){
@@ -172,19 +181,35 @@ init_user_permissions() {
     # restart vscode completely after this
 }
 
-drop_apps(){
-    local app_name=$1
-    show_confirmation_prompt "Are you sure that you want to drop ${app_name:-all apps}?"
-
-    if [[ -n app_name ]]; then 
-      docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/drop_apps.sh --app "$app_name"
-    else
-      docker exec -w //app/extension/shell-scripts adaptive-ui //app/extension/shell-scripts/drop_apps.sh 
-    fi
-}
 
 lint(){
   docker exec -w //app/extension/shell-scripts adaptive-ui bash -c "source /app/venv/bin/activate && /app/extension/shell-scripts/lint_sql.sh ../../apps/"
+}
+
+remote_exists() {
+  local remote_name="$1"
+  if git remote | grep -qw "$remote_name"; then
+    echo "Remote $remote_name already exists."
+    return 0
+  else
+    echo "Remote $remote_name does not exist."
+    return 1
+  fi
+}
+
+sync-template(){
+  local remote_name="template"
+  local remote_url="https://github.com/AlbatrosServiceAgile/TemplateForApps.git"
+
+  if ! remote_exists "$remote_name"; then
+    git remote add -t main "$remote_name" "$remote_url"
+    git remote set-url --push "$remote_name" DISALLOWED
+  fi
+  
+  git fetch template
+  git merge template/main --allow-unrelated-histories --squash --strategy-option theirs
+  git commit -m "Merge remote-tracking branch 'template/main' from template repository"
+  git push
 }
 
 
@@ -194,12 +219,13 @@ up) compose_up "$PROFILE" ;;
 down) compose_down "*" ;;
 pull) compose_pull ;;
 reboot) reboot ;;
-reset-app) reset-app "$APP_NAME" ;;
-reset-apps) reset-apps ;;
-drop-apps) reset-app "$APP_NAME" ;;
+load-apps) load-apps $APP_NAMES ;;
+reset-apps) reset-apps $APP_NAMES ;;
+drop-apps) drop-apps $APP_NAMES ;;
 logs) compose_logs "$PROFILE" "$SERVICES" ;;
 lint) lint ;;
 export) export-all ;;
 import) import-all ;;
+sync-template) sync-template ;;
 *) print_help ;;
 esac
