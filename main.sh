@@ -202,10 +202,10 @@ sync-template(){
     git remote set-url --push "$remote_name" DISALLOWED
   fi
   
-  git fetch template
-  git merge template/main --allow-unrelated-histories --squash --strategy-option theirs
-  git rm .gitignore
-  git commit -m "Merge remote-tracking branch 'template/main' from template repository"
+  git fetch template && \
+  git merge template/main --allow-unrelated-histories --squash --strategy-option theirs && \
+  git rm .gitignore && \
+  git commit -m "Merge remote-tracking branch 'template/main' from template repository" && \
   git push
 }
 
