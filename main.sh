@@ -14,14 +14,16 @@ print_help() {
   echo "  up                       : Start all services using the specified profile (default: dev)"
   echo "  down                     : Stop all services"
   echo "  pull                     : Pull the latest images"
+  echo "  sync-template            : Synchronizes the repo with the template repository"
   echo "  logs                     : Follow the logs of the services (optionally specify services as csv)"
   echo "  load-apps [<app_names>]  : Load apps into the system (optionally specify apps as csv)"
-  echo "  drop-apps <app_name>     : Drop apps from the system (optionally specify apps as csv)"
+  echo "  drop-apps [<app_names>]  : Drop apps from the system (optionally specify apps as csv)"
   echo "  reset-apps [<app_names>] : Reset apps and their data (optionally specify app names as csv)"
   echo "  reboot                   : Resets everything in the database except the users"
   echo "  lint                     : Lints all the sql files under apps/ "
   echo "  export                   : Exports the app configuration and translation data to files in configs/"
-  echo "  import                   : Imports the app configuration and translation data from files in configs/"
+  echo "  import                   : Imports the app configuration from configs/latest/"
+  echo "                              and translation data from configs/lang.json "
   echo "  init                     : Initializes permissions for bind mount volumes"
   exit 1
 }
@@ -32,7 +34,7 @@ while [[ "$#" -gt 0 ]]; do
     PROFILE="$2"
     shift
     ;;
-  up | down | pull | reboot | import | export | init | lint)
+  up | down | pull | reboot | import | export | init | lint | sync-template)
     ACTION="$1"
     shift
     break
@@ -184,6 +186,31 @@ lint(){
   docker exec -w //app/extension/shell-scripts adaptive-ui bash -c "source /app/venv/bin/activate && /app/extension/shell-scripts/lint_sql.sh ../../apps/"
 }
 
+sync-template(){
+  local remote_name="template"
+  local remote_url="https://github.com/AlbatrosServiceAgile/TemplateForApps.git"
+
+  # Check if the command is ran in the template repo   
+  if git remote get-url origin | grep -qw "$remote_url"; then
+    echo "The sync-template command cannot be ran in the template repository."
+    exit 1;
+  fi
+
+  # Check if a "template" remote has already been setup
+  if ! git remote | grep -qw "$remote_name"; then
+    git remote add -t main "$remote_name" "$remote_url"
+    git remote set-url --push "$remote_name" DISALLOWED
+  fi
+
+  local gitignore_exists=$( [ -f .gitignore ] && echo true || echo false )
+  
+  git fetch template && \
+  git merge template/main --allow-unrelated-histories --squash --strategy-option theirs && \
+  if $gitignore_exists; then git checkout HEAD -- .gitignore; else git rm -f .gitignore; fi && \
+  git commit -m "Merge remote-tracking branch 'template/main' from template repository" && \
+  git push
+}
+
 
 case "$ACTION" in
 init) init_user_permissions ;;
@@ -198,5 +225,6 @@ logs) compose_logs "$PROFILE" "$SERVICES" ;;
 lint) lint ;;
 export) export-all ;;
 import) import-all ;;
+sync-template) sync-template ;;
 *) print_help ;;
 esac
