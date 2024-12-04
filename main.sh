@@ -214,13 +214,12 @@ sync-template(){
   git merge template/main --allow-unrelated-histories --squash --strategy-option theirs && \
   if $gitignore_exists; then git checkout HEAD -- .gitignore; else git rm -f .gitignore; fi  
 
-  # Check for new changes
-  if [ -n "$(git status --porcelain)" ]; then
+  # Check if the merge brought any changes
+  if git diff-index --quiet HEAD --; then
     echo "No new changes from the template remote."
     git merge --abort
     exit 1
   fi
-
   # Prevent merging .gitignore file
   git commit -m "Merge remote-tracking branch 'template/main' from template repository" && \
   git push && \
