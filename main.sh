@@ -193,7 +193,14 @@ sync-template(){
   # Check if the command is ran in the template repo   
   if git remote get-url origin | grep -qw "$remote_url"; then
     echo "The sync-template command cannot be ran in the template repository."
-    exit 1;
+    exit 1
+  fi
+
+  # Check for uncommitted changes
+  if ! git diff-index --quiet HEAD --; then
+    echo "There are uncommitted changes in the repository."
+    echo "Please commit or stash them before running sync-template."
+    exit 1
   fi
 
   # Check if a "template" remote has already been setup
@@ -201,11 +208,9 @@ sync-template(){
     git remote add -t main "$remote_name" "$remote_url"
     git remote set-url --push "$remote_name" DISALLOWED
   fi
-  
+
   local gitignore_exists=$( [ -f .gitignore ] && echo true || echo false )
-  
-  git fetch "$remote_name" && \ 
-  # git fetch template && \
+  git fetch "$remote_name"  && \
   git merge template/main --allow-unrelated-histories --squash --strategy-option theirs && \
   # Prevent merging .gitignore file
   if $gitignore_exists; then git checkout HEAD -- .gitignore; else git rm -f .gitignore; fi && \ 
